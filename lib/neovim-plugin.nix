@@ -100,6 +100,11 @@ rec {
 
         package = nixvimOptions.mkPluginPackageOption originalName defaultPackage;
 
+        lazy = mkOption {
+          type = types.bool;
+          default = false;
+        };
+
         settings = mkSettingsOption {
           pluginName = name;
           options = settingsOptions;
@@ -117,9 +122,18 @@ rec {
             extraPlugins = [ cfg.package ] ++ extraPlugins;
             inherit extraPackages;
 
-            ${extraConfigNamespace} = optionalString callSetup ''
+            ${extraConfigNamespace} = optionalString callSetup (if cfg.lazy then ''
+              require("lz.n").load(${toLuaObject cfg.settings})
+            '' else  ''
               require('${luaName}').setup(${toLuaObject cfg.settings})
-            '';
+            '');
+
+            plugins.lazy.plugins = if cfg.lazy.enable then [ ({
+              name = name;
+              pkg = cfg.package;
+              opts = cfg.settings;
+              main = luaName;
+            } // cfg.lazy.spec) ] else [];
           }
           (optionalAttrs (isColorscheme && (colorscheme != null)) { colorscheme = mkDefault colorscheme; })
           (extraConfig cfg)
